@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Author: Severus <severus@theslinux.org>
+# Purpose: get packages with different format
+# License: GPLv3
+
+function _run_update()
+{
+	git pull
+
+}
+function _run_check()
+{
+	git branch -a | sed '/remotes.*/d' > $HOME/TheSLinux/pkg_list
+	rm -rf $HOME/TheSLinux/manual_porti
+	sed -i 's|*||g' $HOME/TheSLinux/pkg_list
+
+        while read _pkg	
+	do	        	
+		git checkout ${_pkg}
+	#	_run_update
+		file=${_pkg}/PKGBUILD
+		_count=$( sed -n '/pkgname=/,/pkgdesc=/p' $file | wc -l) # count the line from pkgname to pkgdesc
+
+		if [ ${_count} -gt 4 ] ; then
+			echo ${_pkg} >> $HOME/TheSLinux/manual_port	
+		fi
+
+	done < $HOME/TheSLinux/pkg_list
+
+}
+
+_run_check
+
