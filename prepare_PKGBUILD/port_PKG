@@ -1,0 +1,80 @@
+#!/bin/bash
+
+# Author: Severus <severus@theslinux.org>
+# Purpose: Auto port PKGBUILD to s-makepkg
+# License: GPLv3
+
+
+# Error function
+function err() {
+	if [ $? -ne 0 ] ; then
+       		echo "Command fails and exited. Please check your working directory"
+       		exit $?
+	fi
+}
+
+# Usage
+function usage() {
+
+	# make sure git in working directory
+	echo "Checking working directory..."
+	 ls .git > /dev/null 2>&1
+
+	# Print message if fails
+	err
+}
+
+# Make sure everything uptodate
+function update() {
+	echo "Checking update..."
+	git pull
+	err
+}
+
+# Switch all branch and port it
+function _port () {
+	# Generate pkg list
+	mkdir -p $HOME/TheSLinux
+	git branch -a | sed '/remotes.*/d' > $HOME/TheSLinux/pkg_list
+	sed -i 's|*||g' $HOME/TheSLinux/pkg_list
+
+	while read _pkg
+		do
+			echo ${_pkg}
+			git checkout ${_pkg}
+#			update
+			file=${_pkg}/PKGBUILD
+			grep pkgname $file > /dev/null 2>&1 # Sure file is not ported
+			_status=$?
+			flag=$(grep ${_pkg} $HOME/TheSLinux/manual_port)
+
+			if [ -f $file ] && [ ${_status} -eq 0 ] && [ x$flag=x ]  ; then
+				echo "porting ${_pkg} at $(date +"%h:%m")" >> $HOME/TheSLinux/port.log
+				sed -i '/pkgname=.*/d' $file
+				sed -i '/pkgver=.*/d' $file
+				sed -i '/pkgrel=.*/d' $file
+				sed -i 's|pkgname|pkgbase|g' $file
+				grep "sums.*)" $file
+				_return=$?
+				if [ ${_return} -eq 0 ] ; then
+					sed -i '/.*sums=/d' $file
+				else sed -i '/.*sums.*/,/[)]/d' $file
+				fi
+				grep "kyanh@theslinux.org" $file # check file modified by Ky Anh
+				answer=$?
+				if [ $answer -ne 0 ] ; then
+					sed -i 's|Maintainer|Origin Maitainer|g' $file
+					sed -i 's|$Id:.*|Maintainer: Severus <severus@theslinux.org>|g' $file
+					sed -i 's|Contributor|Origin Contributor|g' $file
+				fi
+				git add $file
+				git commit -m"Prepare for TheSLinux build
+
+- package information {name,ver,rel,checksums} "
+#				git push
+			fi
+		done < $HOME/TheSLinux/pkg_list
+}
+
+usage
+_port
